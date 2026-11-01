@@ -167,6 +167,19 @@ def check() -> list:
         if "data:font" in css:
             errs.append("css/main.css 仍含 base64 字体，应改为外链")
 
+    # 分发目录里不留未被引用的字体。
+    # 曾有 945KB 的完整字库（与 src/fonts 下源文件逐字节相同、MD5 一致）
+    # 长期躺在 assets/fonts 里跟着分发，而 CSS 早就只引用子集版本。
+    fonts_dir = ROOT / "assets" / "fonts"
+    if fonts_dir.exists() and css_path.exists():
+        try:
+            css_txt = css_path.read_text(encoding="utf-8")
+        except OSError:
+            css_txt = ""
+        for f in sorted(fonts_dir.glob("*.woff2")):
+            if f.name not in css_txt:
+                errs.append(f"assets/fonts/{f.name} 未被 css/main.css 引用（残留字体）")
+
     # index.html 必须引用所有分片（同样要防文件缺失）
     idx_path = ROOT / "index.html"
     if not idx_path.exists():

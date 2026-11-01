@@ -1,6 +1,6 @@
 {
   "name": "ai-chess-arena",
-  "version": "2.10.0",
+  "version": "2.11.0",
   "private": true,
   "description": "AI Chess Arena — 像素风国际象棋，AI 角色擂台战（零运行时依赖，可离线）",
   "license": "GPL-3.0-or-later",
@@ -39,6 +39,6 @@
   "engines": {
     "node": ">=18"
   },
-  "_note": "本项目需通过本地服务器运行（浏览器不允许 file:// 页面读取本地资源）。双击 run.bat 即可。"
+  "_note": "两种运行方式：开发/联机用 run.bat（HTTP，端口 8765）；分发/离线直接双击 offline.html（file:// 双击即玩）。两种外壳由 src/build.py 从同一套 src/parts 分片生成。详见 CONTEXT.md 第二节。"
 }
 

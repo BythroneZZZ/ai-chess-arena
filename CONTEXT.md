@@ -9,26 +9,57 @@
 像素风国际象棋，AI 角色擂台战。棋盘是舞台，AI 是角色，棋步是剧情。
 
 - **运行方式**：双击 `run.bat`（HTTP 模式）或直接双击 **`offline.html`**（完全离线，无需服务器）
-- **当前版本**：v2.10.0
+- **当前版本**：v2.11.0
 - **架构**：多文件 2B（HTTP） + 单文件内联产物（offline.html）
 
 ---
 
-## 二、为什么必须用服务器
+## 二、两种运行方式，以及为什么会有两份外壳
 
-实测结论（无头 Chrome，无特殊启动参数）：
+v2.10 起有两条路径，来自同一套 `src/parts` 分片：
+
+| 方式 | 入口 | 引擎 / 开局库来源 |
+|---|---|---|
+| HTTP（开发、联机、调试） | `run.bat` → `index.html` | `fetch()` 懒加载 |
+| file:// 双击即玩（分发、离线） | 直接双击 `offline.html` | 内联常量 `window.__SF_SRC` / `window.OPENINGS_BOOK` |
+
+### 旧的「必须用服务器」结论只对 fetch 成立
+
+早期这里写的是「`file://` 页面受同源策略约束，读不了任何本地资源，必须通过 HTTP 访问」。
+**这句话只对 `fetch` 成立。** 实测（无头 Chrome，无特殊启动参数）：
 
 ```
-fetch 相对路径   → Failed to fetch
-fetch file:// 绝对 → Failed to fetch
-XHR 同步         → 拒绝
+fetch 相对路径        → Failed to fetch
+fetch file:// 绝对   → Failed to fetch
+XHR 同步             → 拒绝
+ESM / new Worker(相对路径) → 被拦
+经典 <script src>    → ✅ 可用（同目录相对路径也认）
+内联脚本 → Blob Worker → ✅ 可用
+CSS 外链 woff2 字体  → ✅ 加载成功
+localStorage         → ✅ 可用（但有坑，见本节末尾）
 ```
 
-`file://` 页面受同源策略约束，**读不了任何本地资源**。因此 v2.0 拆分为多文件后，
-必须通过 HTTP 访问。`run.bat` 封装了这一步。
+被拦的只有 `fetch` / XHR / ESM / `new Worker(相对路径)` 这四类。
+所以把引擎源码与开局库生成成普通 JS 文件（挂 `window.__SF_SRC`、`window.OPENINGS_BOOK`），
+`file://` 下就能正常加载 —— 这就是 `offline.html` 的原理。
 
-（技术细节：Stockfish 通过 `fetch('./assets/vendor/stockfish.js')` 取源码 → Blob Worker。
-不能用 `<script>` 标签，因为它需要作为独立 Worker 运行，不能污染主线程全局作用域。）
+⚠️ 注意：不能用 `<script src="stockfish.js">` 直接把引擎加载进主线程，
+它需要作为独立 Worker 运行，加载进主线程会污染全局作用域。
+正确做法是取到源码文本 → `Blob` → `new Worker(blobURL)`。
+
+### 为什么不合并成一份外壳
+
+内联资源共约 1.9MB。合并会让 HTTP 用户每次首屏都多解析这 1.9MB，
+而文件模式下 fetch 又必然失败。两份外壳由 `build_shell(offline=?)` 生成，
+产物差异只有两个 `<script>` 标签（且内联脚本必须排在逻辑分片之前，
+因为 `engineSource()` 初始化时就要读全局量）。
+
+### ⚠️ file:// 下的 localStorage 是共享的
+
+Chrome 把所有 `file://` 文档视为同一个 opaque origin，
+**localStorage 在所有本地 HTML 之间共享** —— 任何本地 html 都能读到本项目存的东西。
+因此 API Key 默认写 `sessionStorage`（关标签页即失效），
+用户在设置里显式勾选「记住密钥」才落 localStorage。
 
 ---
 
@@ -75,6 +106,7 @@ chess-arena/
 ├── docs/screenshots/        README 截图
 ├── GDD.md                   设计决策（含 §22 v2.6 落地记录与复核结论）
 ├── CONTEXT.md               本文件
+├── EVALUATION.md            v2.10.0 实测评估与迭代记录
 └── THIRD_PARTY_NOTICES.md
 ```
 
@@ -165,6 +197,7 @@ npm run subset-font # 重新生成中文字体子集（改了文案后跑）
 | **v2.8** | **棋盘朝向规则「玩家1永远在下」+ 手动翻转降级为本局临时覆盖（修跨局泄漏）** |
 | v2.9 | 仓库清理：删死代码/重复 vendor/字体变体（-5.2 MB），修 test_ui_final 孤儿、test_interaction 采样竞态 |
 | **v2.10** | **复盘判级缺陷：评估空值被静默判成 good → unknown + 单点重试 + 覆盖率规则重写** |
+| **v2.11** | **合并外部副本的 P0 修复：ECO 开局库键多算 FEN 第 4 段（吃过路兵）→ 1.e4 / 1.e4 c5 等主流开局全查不到**（详见 GDD §27） |
 
 ---
 
@@ -181,6 +214,7 @@ npm run subset-font # 重新生成中文字体子集（改了文案后跑）
 | 存谱 / 复盘记录归属 | ✅ v2.2.1 |
 | 键盘完整走子（WCAG 2.1.1） | ✅ v2.3 |
 | 评估子系统 8 处缺陷 | ✅ v2.4 |
+| ECO 开局库 ep 键（P0） | ✅ v2.11 |
 | 320px 六页面专项 | ✅ v2.5 |
 | Elo / 成长 | ⛔ 不做（纯堆量） |
 | 后端代理 / 桌面封装 | ⛔ 不做（改交付形态，需单独决策） |
@@ -201,9 +235,13 @@ npm run subset-font # 重新生成中文字体子集（改了文案后跑）
 | 超时判负后无结果面板 | `abort()` 的 `Run.kill()` 推进代次 | 用 `abort({keepToken:true})` 自行收尾 |
 | 引擎预算下限反噬 | 余时 1s 时预算 1200ms > 余时 | `floor = min(1200, 余时×0.5)` |
 | `canUse()` 要求 pendingHuman | AI 收尾 600ms 窗口内按钮是灰的 | 改为「轮到你 + 非 busy」 |
-| `file://` 读本地资源 | 全部失败 | 必须走 HTTP，用 `run.bat` |
+| `file://` 下用 `fetch` 取引擎源码 | Failed to fetch，引擎起不来 | 不必走 HTTP：经典 `<script src>` 在 file:// 下可用，Worker 源码改取内联常量 |
 | 独立 shell 模板 | 新 UI 构建后消失 | `build.py` 从 head+body 组装 |
-| ECO 库键语义 | `1.e4` 后查不到、`moves[0]` 是垃圾着法 | 库索引「走后局面」；`moves` 是全部合法着法 |
+| ECO 库按 FEN 前 4 段建键 | `1.e4` / `1.e4 c5` / `1.e4 d5` 全查不到，界面长期停在「开局阶段」 | 第 4 段（吃过路兵）必须丢掉，只取前 3 段 |
+| ECO 库键语义 | `moves[0]` 是垃圾着法 | 库索引「走后局面」；`moves` 是全部合法着法 |
+| **归一键撞车** | 3 段键会让 `... e6` 与 `... -` 两个原始键指向同一局面 | `_index()` 必须**分两趟**：先只收 ep 为 `-` 的规范条目，再补空；一次性 set 会被带 ep 的覆盖 |
+| 合并分叉副本 | 「哪边文件更新就整目录覆盖」会丢元数据 | 逐文件比哈希 + 逐项判「改进还是回退」，按能力集合合并（见 GDD §27.7） |
+| 测试断言记录 bug 行为 | 旧断言断言「开局阶段 + pending===true」 | 修复后必须同步改断言，否则测试在保护错误行为 |
 | emoji 在像素字体下变方块 | 按钮乱码 | 全改文本标签（PVE / AI·AI / CHARA） |
 | 括号平衡启发式检查 | 正则字面量误判 | 用 `node --check` |
 | Canvas 小尺寸像素模糊 | 棋子边缘发虚 | 按整数倍缩放（`Math.floor`） |

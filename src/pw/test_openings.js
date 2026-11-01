@@ -72,14 +72,24 @@ const ck = (n, c, e) => {
   ck('后翼弃兵识别', /Queen/.test(names[3].name), names[3].eco);
   ck('法兰西识别', /French/.test(names[4].name), names[4].eco);
 
-  console.log('\n=== 3. 开局阶段不瞎猜 ===');
+  console.log('\n=== 3. 前两步就能识别 ===');
   const early = await p.evaluate(() => {
-    const c = new Chess();
-    c.move('e4');
-    const info = Openings.current(c);
-    return { name: info ? info.name : null, pending: info ? !!info.pending : false };
+    const mk = (moves) => { const c = new Chess(); moves.forEach(m => c.move(m)); return Openings.current(c); };
+    return {
+      e4: mk(['e4']),
+      c5: mk(['e4', 'c5']),
+      back: mk(['e4', 'b5'])         // 1.e4 有名字、b5 没有 → 回退到最近的命名局面
+    };
   });
-  ck('初始阶段显示「开局阶段」', early.name === '开局阶段' && early.pending === true, early.name);
+  /* 早先按 FEN 前 4 段建键（含吃过路兵），而库里 3601/3606 条 ep 都是 '-'，
+   * 导致 1.e4 / 1.e4 c5 这些最常见的开局全部查不到，界面长期停在「开局阶段」。
+   * 改成前 3 段后，前两步就该有正式名称。 */
+  ck('1.e4 识别为王兵开局', /King's Pawn/.test((early.e4 && early.e4.name) || ''), (early.e4 && early.e4.name) || 'null');
+  ck('1.e4 c5 识别为西西里', /Sicilian/.test((early.c5 && early.c5.name) || ''), (early.c5 && early.c5.name) || 'null');
+  ck('部分收录时回退到最近命名局面', /King's Pawn/.test((early.back && early.back.name) || '') && !(early.back && early.back.pending), (early.back && early.back.name) || 'null');
+  /* 副作用记录：修复后 20 种首着全部有 ECO 名称，而 current() 取「最近一次命中」，
+   * 只要走过一步就必然命中 —— pending 分支在实战中已不可达，
+   * 界面不会再长期停在「开局阶段」。这正是本次修复的目的。 */
 
   console.log('\n=== 4. 提示着法质量 ===');
   const hints = await p.evaluate(() => {

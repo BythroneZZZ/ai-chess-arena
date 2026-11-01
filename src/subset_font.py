@@ -24,12 +24,13 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SRC = ROOT / "src"
 
-# 简体优先，繁体兜底，最后退到 assets 里的既有子集源。
+# 简体优先，繁体兜底。
 # 其余语言变体（ja/ko/latin/zh_hk/zh_tw）已删除——本项目只出简体中文文案。
+# 早先这里还有第三个候选 assets/fonts/fusion-pixel-12px-zh.woff2，
+# 它与上面第一个文件逐字节相同（MD5 一致），属于分发目录里的重复副本，已删除。
 CANDIDATES = [
     SRC / "fonts" / "fusion" / "fusion-pixel-12px-proportional-zh_hans.ttf.woff2",
     SRC / "fonts" / "fusion" / "fusion-pixel-12px-proportional-zh_hant.ttf.woff2",
-    ROOT / "assets" / "fonts" / "fusion-pixel-12px-zh.woff2",
 ]
 OUT = ROOT / "assets" / "fonts" / "fusion-pixel-subset.woff2"
 

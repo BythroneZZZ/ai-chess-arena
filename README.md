@@ -6,7 +6,7 @@
 
 ![对战界面：像素棋盘 + 双角色立绘 + 实时评估条](docs/screenshots/01-battle-eval.png)
 
-![status](https://img.shields.io/badge/version-2.10.0-ffcc4d)
+![status](https://img.shields.io/badge/version-2.11.0-ffcc4d)
 ![license](https://img.shields.io/badge/license-GPL--3.0-blue)
 ![deps](https://img.shields.io/badge/runtime-zero%20dependency-63e6a0)
 ![test](https://img.shields.io/badge/test-15%20suites%20pass-brightgreen)

@@ -5,8 +5,9 @@
  *   { v, families[], segments[], pos: { "<FEN前4段>": [eco, famIdx, segIds[], nextUci] } }
  *
  * 设计要点：
- *   1. 按 FEN 前 4 段索引（棋盘+走子+易位+吃过路），忽略半回合/回合数
+ *   1. 按 FEN 前 3 段索引（棋盘+走子方+易位权），忽略吃过路兵/半回合/回合数。
  *      这样同一局面无论从哪条路径到达都能命中。
+ *      ⚠️ 吃过路兵那段**不能**计入 key —— 详见 keyOf() 的注释。
  *   2. 懒加载：首次查询或开局提示时才 fetch，不拖慢首屏。
  *   3. 每个位置给出 nextUci —— 这是「该开局下已被收录的下一手」，用于提示功能。
  *   4. 名称按 family + segments 池化，还原时拼接，361 KB 装下 3606 条。
@@ -38,7 +39,7 @@ const Openings = {
         }
         if (!json || json.v !== 1 || !json.pos) throw new Error('数据格式不符');
         this.data = json;
-        this._byFen = new Map(Object.entries(json.pos));
+        this._byFen = this._index(json);
         return json;
       } catch (e) {
         this.failed = true;
@@ -53,9 +54,37 @@ const Openings = {
 
   ready() { return !!this.data; },
 
-  /* chess.js 的 fen() -> 索引键 */
+  /* chess.js 的 fen() -> 索引键：只取前 3 段（棋盘 + 走子方 + 易位权）
+   *
+   * 为什么第 4 段（吃过路兵）必须丢掉：
+   *   那段只是「上一步是不是双步兵」的临时标记，同一棋盘局面在 ECO 里是同一条。
+   *   而原始数据的 3606 条里，只有 5 条带 ep 值，其余 3601 条都是 '-'。
+   *   一旦把 ep 计入 key，chess.js 在双步兵之后给出的 'c6' / 'e6' / 'e3' / 'd6'
+   *   就永远匹配不上 '-'，结果是——
+   *       1.e4（王兵开局）、1.e4 c5（西西里）、1.e4 e5、1.e4 d5（斯堪的纳维亚）
+   *   这些最常见的开局**全部查不到**，开局名要等到 2.Nf3 之后（ep 归位）才肯显示。
+   *   实测：开局识别功能因此基本失效，界面长期停在「开局阶段」。
+   */
   keyOf(fen) {
-    return String(fen || '').split(' ').slice(0, 4).join(' ');
+    return String(fen || '').split(' ').slice(0, 3).join(' ');
+  },
+
+  /* 建索引：把原始 4 段键归一化成 3 段。
+   *
+   * 归一化会让两条原始键撞车（如 '... w KQkq e6' 与 '... w KQkq -' 指向同一局面）。
+   * 实测只有 1 组冲突，且两条的名称不同，所以分两趟建：
+   *   第一趟只收 ep 为 '-' 的规范条目，第二趟补空（带 ep 的不覆盖规范的）。 */
+  _index(json) {
+    const entries = Object.entries(json.pos);
+    const m = new Map();
+    for (const [k, v] of entries) {
+      if (k.split(' ')[3] === '-') m.set(this.keyOf(k), v);
+    }
+    for (const [k, v] of entries) {
+      const k3 = this.keyOf(k);
+      if (!m.has(k3)) m.set(k3, v);
+    }
+    return m;
   },
 
   nameOf(entry) {

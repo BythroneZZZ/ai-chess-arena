@@ -2060,3 +2060,107 @@ OK  unknown 不进关键失误列表
 | `m.loss || 0` 这类写法 | `null` 被静默转成 `0` | 展示层用 `??`/显式判 `null`，别用 `||` 兜数字 |
 | 覆盖率当质量门 | 80% 阈值恰好放行最坏情况 | 阈值门只能挡「整体崩」，不能替代「逐项标注未知」 |
 | 界面文案想用 `⚠` 做警示 | 像素字体里 emoji 渲染成方块（同 §13 坑表「emoji 在像素字体下变方块」） | 子集字体只含 GB2312 一级 + ASCII，警示文案一律写中文「注意：」 |
+
+---
+
+## 27. v2.11 合并外部副本：ECO 开局库 en-passant 键（P0 真缺陷）
+
+### 27.1 起因
+
+用户在 `E:\临时解压\chess-arena` 有一个副本，说「相比工作路径有更新」。逐文件 SHA256 比对后：两树各 89 个文件（排除 `node_modules` / `__pycache__` / `.git`），**8 个内容不同 + 1 个 E 独有**（`EVALUATION.md` v2.10.0 版），其余哈希全同。
+
+结论：**E 不是超集，是分叉副本**——多 1 个真 P0 修复，但同时回退了 3 个元数据文件（`package.json` 缺 license/repository/keywords、`.gitignore` 只有 10 行、`CONTEXT.md` 目录树缺 LICENSE/README/docs 三行）。作者拿的是我补 GitHub 元数据之前的版本。
+
+### 27.2 缺陷：`keyOf()` 多算了 FEN 第 4 段
+
+```js
+/* 修复前（v2.0 ~ v2.10） */
+keyOf(fen) { return String(fen || '').split(' ').slice(0, 4).join(' '); }
+this._byFen = new Map(Object.entries(json.pos));   // 原样用 4 段键
+```
+
+FEN 第 4 段是**吃过路兵标记**，只是「上一步是不是双步兵」的临时标记，同一棋盘局面在 ECO 里是同一条。而 `data/openings.json` 的 3606 条里：
+
+| 第 4 段取值 | 条数 |
+|---|---|
+| `-` | 3592 |
+| `f6` | 4 |
+| `e6` | 3 |
+| `b6` | 2 |
+| `e3` / `c3` / `g3` / `h3` | 各 1 |
+
+非 `-` 共 14 条。于是 `1.e4`（chess.js 给出 `... w KQkq e3`，因为 e2e4 是双步兵）永远匹配不上 `... w KQkq -`。
+
+**实测（两边逻辑直接跑同一份 `data/openings.json`）**：
+
+| 输入 | 修复前 | 修复后 |
+|---|---|---|
+| `e4` | null | King's Pawn Game |
+| `e4 c5` | null | Sicilian Defense |
+| `e4 e5` | null | King's Pawn Game |
+| `e4 d5` | null | Scandinavian Defense |
+| `d4` | null | Queen's Pawn Game |
+| `c4` | null | English Opening |
+| `Nf3` | Zukertort Opening | Zukertort Opening |
+
+只有「非双步兵开局」（如 `1.Nf3`）碰巧正确。⇒ **最主流的一批开局全部查不到，界面长期停在「开局阶段」**；`suggest()` 的提示质量同受影响。
+
+### 27.3 修法：3 段键 + 两趟归一化索引
+
+```js
+keyOf(fen) { return String(fen || '').split(' ').slice(0, 3).join(' '); }
+
+_index(json) {
+  const entries = Object.entries(json.pos);
+  const m = new Map();
+  // 第一趟：只收 ep 为 '-' 的规范条目
+  for (const [k, v] of entries) if (k.split(' ')[3] === '-') m.set(this.keyOf(k), v);
+  // 第二趟：补空（带 ep 的不得覆盖规范的）
+  for (const [k, v] of entries) { const k3 = this.keyOf(k); if (!m.has(k3)) m.set(k3, v); }
+  return m;
+}
+```
+
+归一化会让两条原始键撞车（`... w KQkq e6` 与 `... w KQkq -` 指向同一局面）。实测只有 1 组冲突且名称不同，所以**必须分两趟**：第一趟只收规范条目，第二趟才补空。若一次性 `set`，带 ep 的条目可能覆盖掉规范条目，等于换了个方式出错。
+
+### 27.4 配套改动（均采纳 E 版）
+
+1. `src/pw/test_openings.js` 第 3 节断言按新语义重写：`1.e4` → `/King's Pawn/`、`1.e4 c5` → `/Sicilian/`、部分收录时回退到最近命名局面。旧断言 `early.name === '开局阶段' && early.pending === true` 记录的是 bug 行为，删除。
+2. `src/build.py` `check()` 新增防回归：`assets/fonts` 下存在**未被 `css/main.css` 引用的 woff2** 即报错。背景：曾有 945KB 完整字库与 `src/fonts` 源文件 MD5 相同、长期躺在分发目录。
+3. `src/subset_font.py`：删掉指向已删副本 `assets/fonts/fusion-pixel-12px-zh.woff2` 的第三个候选源（CANDIDATES 只剩 `src/fonts/fusion/` 下 zh_hans / zh_hant 两个）。
+4. `CONTEXT.md` §二重写为「两种运行方式，以及为什么会有两份外壳」，补 `file://` 下的真实可用矩阵。
+5. `package.json` `_note` 改为双模式说明（license/repository/keywords 保持我的版本）。
+6. 新增 `EVALUATION.md`（v2.10.0 版，148 行）——**注意与 v2.6 时删掉的 v2.5.0 旧报告不是同一份**，这份是新的外部评估。
+
+### 27.5 `file://` 可用性矩阵（CONTEXT §二 实测结论）
+
+| 能力 | `file://` 下 |
+|---|---|
+| `fetch` 相对路径 / `file://` 绝对 | Failed to fetch |
+| XHR 同步 | 拒绝 |
+| ESM / `new Worker(相对路径)` | 被拦 |
+| 经典 `<script src>` | 可用（同目录相对路径也认） |
+| 内联脚本 → Blob Worker | 可用 |
+| CSS 外链 woff2 | 加载成功 |
+| localStorage | 可用（但所有 `file://` 文档共享同一个 opaque origin） |
+
+⇒ 早期「`file://` 读不了任何本地资源」的结论**只对 `fetch` 成立**，这才是 `offline.html` 可行的原理。
+
+### 27.6 流程：保留副本 → 执行 → 测试 → 删副本
+
+用户要求「保留副本并执行，测试无bug后删除副本」。执行顺序：
+
+1. `robocopy /E` 备份到 `chess-arena.backup-20261101-090052`（排除 `node_modules`/`__pycache__`/`.git`），89 文件 / 9.23 MB，路径写入 `$env:TEMP\chess-arena-backup-path.txt`。
+2. 复制 E 的 6 个文件 + 删死字体，同时保住 D 的 3 处元数据。
+3. `npm run build`（同步 `js/`）+ `npm run check`（OK 17 模块）。
+4. `npm test` 全量 15 套件 → 全 PASS。
+5. 全绿后才删备份目录。
+
+### 27.7 踩坑
+
+| 坑 | 现象 | 结论 |
+|---|---|---|
+| 只看「哪边更新/文件更多」 | E 有 1 个真修复，但回退了 3 个元数据文件 | 分叉副本要逐文件比哈希，并逐项判断「这是改进还是回退」，不能整目录覆盖 |
+| 只改 `src/parts` 就以为完事 | `js/` 是构建产物 | `npm run build` 必须跑；`offline.html` 通过 `<script src="./js/08b_openings.js">` 外部引用，不内联该模块，所以只有一份 `keyOf` |
+| 用「最新覆盖最旧」合并 | `package.json` 会丢 license/repository | 合并以「能力集合」为准：新修复进来，元数据保住 |
+| 测试断言记录 bug 行为 | 旧断言断言「开局阶段 + pending」 | 修复后必须同步改断言，否则测试在保护错误行为 |
