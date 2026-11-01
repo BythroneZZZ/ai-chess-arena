@@ -1,0 +1,26 @@
+# ---- 依赖 ----
+# 测试依赖：npm run setup / npm test 会自动安装
+src/pw/node_modules/
+node_modules/
+
+# ---- Python ----
+# build.py 会 import subset_font，运行时自动生成字节码
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ---- 系统 / 编辑器 ----
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*~
+
+# ---- 临时产物 / 日志 ----
+*.log
+tmp_*
+*.tmp

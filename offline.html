@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>AI CHESS ARENA · AI 角色擂台战</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 fill=%27%23100c1e%27/%3E%3Crect x=%273%27 y=%276%27 width=%2710%27 height=%274%27 fill=%27%23ffcc4d%27/%3E%3Crect x=%276%27 y=%272%27 width=%274%27 height=%274%27 fill=%27%23ece8ff%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="./css/main.css">
+</head>
+<body>
+<div id="app">
+
+<!-- ========================= HOME ========================= -->
+<section class="screen on" id="screen-home">
+  <div class="logo-wrap">
+    <div class="badge">8-BIT · API OPEN · OFFLINE READY</div>
+    <div class="logo">AI CHESS<br><em>ARENA</em></div>
+    <div class="sub-logo">A I 角 色 擂 台 战</div>
+  </div>
+
+  <div class="home-grid">
+    <div class="mode-card" data-go="setup" data-mode="pve">
+      <span class="num">01</span>
+      <span class="ico">PVE</span>
+      <h3>人机对弈</h3>
+      <p>你 vs Stockfish 引擎。角色在旁边边说风凉话边下棋，四档难度，台词随局面变化。</p>
+    </div>
+    <div class="mode-card" data-go="setup" data-mode="aivai">
+      <span class="num">02</span>
+      <span class="ico">AI·AI</span>
+      <h3>双 API 擂台</h3>
+      <p>两个 AI 角色各自接自己的模型，自动对轰。可随时接管任意一方，当导演也当选手。</p>
+    </div>
+    <div class="mode-card" data-go="setup" data-mode="pvp">
+      <span class="num">03</span>
+      <span class="ico">PVP</span>
+      <h3>本地双人</h3>
+      <p>同一台设备轮流落子。可选让 AI 角色当解说，每步都来一句吐槽。</p>
+    </div>
+    <div class="mode-card" data-go="characters">
+      <span class="num">04</span>
+      <span class="ico">CHARA</span>
+      <h3>角色工坊</h3>
+      <p>名称、风格标签、像素立绘、System Prompt 全自定义。内置嘉豪等四个示例角色。</p>
+    </div>
+    <div class="mode-card" data-go="api">
+      <span class="num">05</span>
+      <span class="ico">API</span>
+      <h3>API 配置</h3>
+      <p>Base URL + Key + Model 即可。OpenAI 兼容 / Anthropic / 自定义请求体，全本地保存。</p>
+    </div>
+    <div class="mode-card" data-go="records">
+      <span class="num">06</span>
+      <span class="ico">REPLAY</span>
+      <h3>棋谱回放</h3>
+      <p>保存的对局可逐步重放，也能换一组角色重新解说同一盘棋。</p>
+    </div>
+  </div>
+
+  <div class="home-foot">
+    <span class="kbd">纯前端</span> · 数据仅存本机 · 音效 ZzFX 合成 · 引擎 Stockfish 本地运行
+    <br><span style="opacity:.7">键盘：Space 暂停 · → 单步 · Esc 关闭弹窗</span>
+    <br><span style="opacity:.7">双击 <b>offline.html</b> 可完全离线开局（无需服务器）</span>
+  </div>
+</section>
+
+<!-- ========================= SETUP ========================= -->
+<section class="screen" id="screen-setup">
+  <div class="shell">
+    <div class="topbar">
+      <button class="px-btn small" data-go="home">返回</button>
+      <h2 id="setupTitle">擂台设置</h2>
+      <div class="spacer"></div>
+      <button class="px-btn small" id="btnSetupChars">角色</button>
+      <button class="px-btn small" id="btnSetupApi">API</button>
+    </div>
+
+    <div class="setup-cols" id="setupCols">
+      <!-- LEFT combatant -->
+      <div class="px panel-pad" id="setupLeftPanel">
+        <div class="panel-title" id="leftTitle">WHITE SIDE</div>
+        <div class="col">
+          <div>
+            <label class="lab">角色</label>
+            <select class="field" id="selCharL"></select>
+          </div>
+          <div id="apiRowL">
+            <label class="lab">API 配置 <span class="hint">（留空 = 纯本地模式）</span></label>
+            <select class="field" id="selApiL"></select>
+          </div>
+          <div id="difficultyRow">
+            <label class="lab">难度</label>
+            <select class="field" id="selDiff">
+              <option value="1">入门 · 深度 6 · 约 0.2s</option>
+              <option value="2" selected>普通 · 深度 10 · 约 1s</option>
+              <option value="3">高手 · 深度 14 · 约 8s</option>
+              <option value="4">地狱 · 深度 20 · 约 25s</option>
+            </select>
+          </div>
+          <div id="sideRow">
+            <label class="lab">玩家执子</label>
+            <select class="field" id="selSide">
+              <option value="w">执白（先手）</option>
+              <option value="b">执黑（后手）</option>
+            </select>
+          </div>
+          <div id="clockRow">
+            <label class="lab">时限 <span class="hint">（AI 思考计入它自己的钟）</span></label>
+            <select class="field" id="selClock">
+              <option value="unlimited" selected>不限时</option>
+              <option value="blitz3">3+2 闪电</option>
+              <option value="blitz5">5+0 快棋</option>
+              <option value="rapid10">10+5 快棋</option>
+              <option value="classic15">15+10 经典</option>
+            </select>
+          </div>
+          <div id="narratorRow" class="col">
+            <div>
+              <label class="lab">解说角色</label>
+              <select class="field" id="selNarrator"></select>
+            </div>
+            <div>
+              <label class="lab">解说 API <span class="hint">（留空 = 只用内置台词）</span></label>
+              <select class="field" id="selNarrApi"></select>
+            </div>
+          </div>
+          <div class="row" id="delayRowPve">
+            <label class="lab" style="margin:0">思考延迟</label>
+            <input type="range" class="field grow" id="rngDelay" min="0" max="3000" step="100" value="700">
+            <span class="mono" id="lblDelay" >700ms</span>
+          </div>
+          <div class="col hidden" id="paramsL">
+            <div class="row">
+              <label class="lab" style="margin:0;width:74px">Temperature</label>
+              <input type="range" class="field grow" id="rngTempL" min="0" max="1.5" step="0.05" value="0.9">
+              <span class="mono" id="lblTempL" >0.90</span>
+            </div>
+            <div class="row">
+              <label class="lab" style="margin:0;width:74px">Max tokens</label>
+              <input class="field" id="inpMaxTokL" type="number" min="24" max="256" value="80" style="width:90px">
+              <label class="lab" style="margin:0;width:60px">思考延迟</label>
+              <input class="field" id="inpDelayL" type="number" min="0" max="8000" step="100" value="900" style="width:90px">
+            </div>
+          </div>
+          <div class="hint" id="leftHint">人机模式：引擎算棋，角色只负责说话。</div>
+        </div>
+      </div>
+
+      <!-- RIGHT combatant -->
+      <div class="px panel-pad" id="setupRightPanel">
+        <div class="panel-title" id="rightTitle">BLACK SIDE</div>
+        <div class="col">
+          <div>
+            <label class="lab">角色</label>
+            <select class="field" id="selCharR"></select>
+          </div>
+          <div id="apiRowR">
+            <label class="lab">API 配置 <span class="hint">（留空 = 纯本地模式）</span></label>
+            <select class="field" id="selApiR"></select>
+          </div>
+          <div class="row" id="tempRowPve">
+            <label class="lab" style="margin:0">Temperature</label>
+            <input type="range" class="field grow" id="rngTemp" min="0" max="1.5" step="0.05" value="0.9">
+            <span class="mono" id="lblTemp" >0.90</span>
+          </div>
+          <div class="col hidden" id="paramsR">
+            <div class="row">
+              <label class="lab" style="margin:0;width:74px">Temperature</label>
+              <input type="range" class="field grow" id="rngTempR" min="0" max="1.5" step="0.05" value="1.0">
+              <span class="mono" id="lblTempR" >1.00</span>
+            </div>
+            <div class="row">
+              <label class="lab" style="margin:0;width:74px">Max tokens</label>
+              <input class="field" id="inpMaxTokR" type="number" min="24" max="256" value="80" style="width:90px">
+              <label class="lab" style="margin:0;width:60px">思考延迟</label>
+              <input class="field" id="inpDelayR" type="number" min="0" max="8000" step="100" value="900" style="width:90px">
+            </div>
+          </div>
+          <div id="rightHint" class="hint">AI 方：模型返回 UCI 棋步 + 台词，非法步自动兜底。</div>
+          <div class="hr"></div>
+          <div class="panel-title" id="aivaiOptsTitle" style="margin-bottom:6px">AI vs AI 观战选项</div>
+          <div class="col" id="aivaiOpts">
+            <div class="row">
+              <label class="lab" style="margin:0">自动播放</label>
+              <input type="checkbox" id="chkAuto" checked>
+              <span class="hint">每步自动推进</span>
+            </div>
+            <div class="row">
+              <label class="lab" style="margin:0">最长步数</label>
+              <input class="field" id="inpMaxMoves" type="number" min="20" max="300" value="120" style="width:90px">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row" style="justify-content:center;margin-top:6px">
+      <button class="px-btn gold" id="btnStartMatch" style="font-size:16px;padding:12px 30px">开始对局</button>
+      <button class="px-btn small" id="btnFlipSides" title="交换双方">⇄ 交换</button>
+    </div>
+    <div class="hint center" id="setupWarn"></div>
+  </div>
+</section>
+
+<!-- ========================= CHARACTERS ========================= -->
+<section class="screen" id="screen-characters">
+  <div class="shell">
+    <div class="topbar">
+      <button class="px-btn small" data-go="home">返回</button>
+      <h2>角色工坊 <span class="mono" style="font-size:10px;color:#7d74a6">CHARACTER FORGE</span></h2>
+      <div class="spacer"></div>
+      <button class="px-btn small green" id="btnNewChar">+ 新建角色</button>
+      <button class="px-btn small" id="btnRestorePresets">恢复示例</button>
+    </div>
+    <div class="card-grid" id="charGrid"></div>
+    <div class="hint">点击卡片编辑。角色 Prompt 生成器会按标签自动拼接，可继续手改。</div>
+    <div class="px panel-pad" style="margin-top:6px">
+      <div class="panel-title">风格标签库 · 15 种（可组合）</div>
+      <div class="tag-legend" id="tagGallery"></div>
+      <div class="hint" style="margin-top:8px">标签决定 System Prompt 的「性格详细定义」段落与台词池；最多选 3 个叠加，或直接写自定义人格。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ========================= API ========================= -->
+<section class="screen" id="screen-api">
+  <div class="shell">
+    <div class="topbar">
+      <button class="px-btn small" data-go="home">返回</button>
+      <h2>API 配置 <span class="mono" style="font-size:10px;color:#7d74a6">CONNECTIONS</span></h2>
+      <div class="spacer"></div>
+      <button class="px-btn small green" id="btnNewApi">+ 新建配置</button>
+    </div>
+    <div class="setup-cols">
+      <div class="px panel-pad">
+        <div class="panel-title">已保存配置</div>
+        <div class="col" id="apiList"></div>
+        <div class="hint" style="margin-top:8px">Key 只存在本机 localStorage，不会上传。跨域失败多半是服务端没开 CORS。</div>
+      </div>
+      <div class="px panel-pad" id="apiEditor">
+        <div class="panel-title">编辑</div>
+        <div class="col">
+          <div><label class="lab">配置名称</label><input class="field" id="apiName" placeholder="我的 GPT"></div>
+          <div><label class="lab">请求格式</label>
+            <select class="field" id="apiFmt">
+              <option value="openai">OpenAI 兼容 (/chat/completions)</option>
+              <option value="anthropic">Anthropic (/v1/messages)</option>
+              <option value="custom">自定义端点 + 模板</option>
+            </select>
+          </div>
+          <div><label class="lab">API Base URL</label><input class="field" id="apiBase" placeholder="https://api.openai.com/v1"></div>
+          <div><label class="lab">API Key</label><input class="field" id="apiKey" type="password" placeholder="sk-..."></div>
+          <div><label class="lab">Model Name</label><input class="field" id="apiModel" placeholder="gpt-4o / deepseek-chat / claude-..."></div>
+          <div id="customWrap" class="hidden">
+            <label class="lab">自定义请求体模板（JSON，支持 {{system}} {{user}} {{model}} {{temperature}} {{max_tokens}}）</label>
+            <textarea class="field" id="apiCustomBody" rows="7" spellcheck="false">{&quot;model&quot;:&quot;{{model}}&quot;,&quot;messages&quot;:[{&quot;role&quot;:&quot;system&quot;,&quot;content&quot;:&quot;{{system}}&quot;},{&quot;role&quot;:&quot;user&quot;,&quot;content&quot;:&quot;{{user}}&quot;}]}</textarea>
+            <label class="lab" style="margin-top:8px">响应文本提取路径（如 choices.0.message.content）</label>
+            <input class="field" id="apiCustomPath" placeholder="choices.0.message.content">
+          </div>
+          <div class="row" style="margin-top:4px">
+            <button class="px-btn" id="btnSaveApi">保存</button>
+            <button class="px-btn cyan" id="btnTestApi">测试连接</button>
+            <button class="px-btn danger small" id="btnDelApi">删除</button>
+          </div>
+          <div class="row" style="margin-top:6px">
+            <button class="px-btn small" id="btnClearKey">清空此密钥</button>
+            <button class="px-btn small" id="btnExportSafe">导出（脱敏）</button>
+            <button class="px-btn small" id="btnClearAllKeys">清空全部密钥</button>
+          </div>
+          <div class="row" style="margin-top:6px">
+            <label class="lab" style="margin:0">记住密钥</label>
+            <input type="checkbox" id="chkRememberKeys">
+            <span class="hint" id="rememberKeysHint">关闭时密钥只存在当前标签页，关掉即失效</span>
+          </div>
+          <div class="hint" id="apiSecNote">
+            密钥默认只存在本会话（sessionStorage）。勾选「记住密钥」才写入 localStorage——
+            注意：本地文件（file://）下所有网页共用一份存储，勾选前请确认设备可信。
+          </div>
+          <div class="hr"></div>
+          <div class="panel-title" style="margin-bottom:6px">受信任端点</div>
+          <div class="col" id="trustedList" style="gap:6px"></div>
+          <div class="hint" style="margin-top:6px">每个新地址在首次发送密钥前都会要求确认；此处可随时撤销。</div>
+          <div id="apiTestOut" class="hint"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========================= RECORDS ========================= -->
+<section class="screen" id="screen-records">
+  <div class="shell">
+    <div class="topbar">
+      <button class="px-btn small" data-go="home">返回</button>
+      <h2>棋谱库</h2>
+      <div class="spacer"></div>
+      <button class="px-btn small cyan" id="btnImportPgn">导入 PGN</button>
+      <button class="px-btn small danger" id="btnClearRecords">清空</button>
+    </div>
+    <div class="card-grid" id="recGrid"></div>
+    <div class="hint">点开即进入回放；回放页可让任一 API 角色重新解说整盘棋。</div>
+    <div class="px panel-pad hidden" id="pgnBox">
+      <div class="panel-title">导入 PGN</div>
+      <textarea class="field" id="pgnInput" rows="8" spellcheck="false"
+        placeholder="粘贴 PGN 文本，例如：&#10;[Event &quot;Casual&quot;]&#10;1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 *"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="px-btn green small" id="btnDoImport">解析并保存</button>
+        <button class="px-btn small" id="btnCancelImport">取消</button>
+        <span class="hint" id="pgnImportMsg"></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========================= BATTLE ========================= -->
+<section class="screen" id="screen-battle">
+  <div class="shell" style="max-width:1180px">
+    <div class="topbar" style="margin-bottom:2px">
+      <button class="px-btn small" data-act="abort">离场</button>
+      <span class="mono" id="battleModeLabel" style="font-size:10px;color:#9c92c8">PVE</span>
+      <div class="spacer"></div>
+      <button class="px-btn small" id="btnPace" title="切换演出节奏（完整/快速/仅棋步）"><span id="paceLabel">演出 FULL</span></button>
+      <button class="px-btn small" id="btnContrast" title="高对比模式">对比</button>
+      <button class="px-btn small" id="btnToggleSound">音效 ON</button>
+      <button class="px-btn small" id="btnToggleBgm">BGM OFF</button>
+      <button class="px-btn small" id="btnTogglePieces">棋子样式</button>
+      <button class="px-btn small" id="btnFlipBoard">翻转</button>
+      <button class="px-btn small" id="btnEval" title="局面评估条（第二引擎 Worker，可关闭省内存）">评估 ON</button>
+      <button class="px-btn small" id="btnHint">提示</button>
+      <button class="px-btn small" id="btnUndo">悔棋</button>
+      <button class="px-btn small" id="btnDraw">提和</button>
+      <button class="px-btn small" id="btnResign">认输</button>
+    </div>
+
+    <div class="battle">
+      <!-- left portrait -->
+      <div class="portrait-wrap" id="sideLWrap">
+        <div class="p-ava-box"><canvas id="portraitL" width="32" height="32"></canvas><i class="tear" style="left:38%"></i><i class="tear" style="left:60%;animation-delay:.45s"></i></div>
+        <div class="p-name" id="nameL">—</div>
+        <div class="p-tags" id="tagsL"></div>
+        <div class="clock hidden" id="clockL">—</div>
+        <div class="morale"><div class="lab"><span>气势</span><span id="moraleLNum">50</span></div><div class="bar"><div class="fill" id="moraleL"></div></div></div>
+        <div class="bubble think" id="bubbleL"><span class="who" id="whoL">—</span><span id="bubbleLText">等待开局…</span></div>
+        <div class="row" id="takeoverL" style="display:none"><button class="px-btn small cyan" data-takeover="w">接管白方</button></div>
+      </div>
+
+      <!-- board -->
+      <div class="board-col">
+        <div class="board-row">
+          <div id="boardFrame">
+            <canvas id="boardCanvas" width="480" height="480"
+                    role="img" aria-label="国际象棋棋盘" aria-describedby="boardA11y" tabindex="0"></canvas>
+            <div id="promoOverlay" role="dialog" aria-label="选择升变棋子"><div class="promo-box" id="promoBox"></div></div>          </div>
+          <div class="eval-col" id="evalCol" title="局面评估">
+            <canvas id="evalCanvas" width="22" height="480" role="img" aria-label="局面评估条"></canvas>
+            <div class="eval-num mono" id="evalNum">0.0</div>
+          </div>
+        </div>
+        <p id="boardA11y" class="sr-only" aria-live="polite"></p>
+        <div class="kbd-hint">键盘：Tab 聚焦棋盘 · 方向键移动光标 · 回车选中/落子 · Esc 取消</div>
+        <div class="status-strip">
+          <span class="turn-pill" id="turnPill">WHITE TO MOVE</span>
+          <span class="eval-inline" id="evalInline" title="局面评估">0.0</span>
+          <span id="openingName" class="opening-name" title="当前开局"></span>
+          <span id="statusText">准备中…</span>
+          <span class="think-dots" id="thinkDots" style="display:none"><i></i><i></i><i></i></span>
+        </div>
+      </div>
+
+      <!-- right portrait -->
+      <div class="portrait-wrap" id="sideRWrap">
+        <div class="p-ava-box"><canvas id="portraitR" width="32" height="32"></canvas><i class="tear" style="left:40%"></i><i class="tear" style="left:62%;animation-delay:.45s"></i></div>
+        <div class="p-name" id="nameR">—</div>
+        <div class="p-tags" id="tagsR"></div>
+        <div class="clock hidden" id="clockR">—</div>
+        <div class="morale"><div class="lab"><span>气势</span><span id="moraleRNum">50</span></div><div class="bar"><div class="fill" id="moraleR"></div></div></div>
+        <div class="bubble think" id="bubbleR"><span class="who" id="whoR">—</span><span id="bubbleRText">等待开局…</span></div>
+        <div class="row" id="takeoverR" style="display:none"><button class="px-btn small cyan" data-takeover="b">接管黑方</button></div>
+      </div>
+    </div>
+
+    <div class="logbar">
+      <span class="mono" style="color:#7d74a6">MOVES</span>
+      <div class="logscroll" id="moveLog"><span class="log-empty">— 未落子 —</span></div>
+      <button class="px-btn small" id="btnPause">II</button>
+      <button class="px-btn small" id="btnNext" style="display:none">下一步</button>
+    </div>
+  </div>
+</section>
+
+<!-- ========================= REPLAY ========================= -->
+<section class="screen" id="screen-replay">
+  <div class="shell">
+    <div class="topbar">
+      <button class="px-btn small" data-go="records">棋谱库</button>
+      <h2>回放</h2>
+      <div class="spacer"></div>
+      <button class="px-btn small" id="btnPaceRp">演出</button>
+      <button class="px-btn small cyan" id="btnRecomment">换角色重新解说</button>
+    </div>
+    <div class="replay-wrap">
+      <div class="board-col">
+        <div id="boardFrameR" style="position:relative;padding:12px;background:linear-gradient(180deg,#493a86,#2b2250 55%,#1d1740);border:4px solid var(--ink);box-shadow:inset 0 0 0 4px #6a58b8,inset 0 0 0 8px #241c47,10px 10px 0 rgba(0,0,0,.6)">
+          <canvas id="replayCanvas" width="480" height="480" role="img" aria-label="回放棋盘" aria-describedby="replayA11y"></canvas>
+        </div>
+        <p id="replayA11y" class="sr-only" aria-live="polite"></p>
+        <div class="row" style="justify-content:center">
+          <button class="px-btn small" id="rpFirst">|&lt;</button>
+          <button class="px-btn small" id="rpPrev">&lt;</button>
+          <span class="mono" id="rpIdx" style="font-size:10px">0 / 0</span>
+          <button class="px-btn small" id="rpNext">&gt;</button>
+          <button class="px-btn small" id="rpLast">&gt;|</button>
+          <button class="px-btn small green" id="rpPlay">PLAY</button>
+        </div>
+      </div>
+      <div class="replay-side">
+        <div class="px panel-pad">
+          <div class="panel-title">对局信息</div>
+          <div class="stat-line"><span>白方</span><b id="rpWhite">—</b></div>
+          <div class="stat-line"><span>黑方</span><b id="rpBlack">—</b></div>
+          <div class="stat-line"><span>结果</span><b id="rpResult">—</b></div>
+          <div class="stat-line"><span>步数</span><b id="rpCount">0</b></div>
+          <div class="stat-line"><span>模式</span><b id="rpMode">—</b></div>
+          <div class="stat-line"><span>复盘</span><b id="reviewAcc">—</b></div>
+        </div>
+        <div class="px panel-pad">
+          <div class="panel-title">当前步</div>
+          <div class="hint" id="rpMoveInfo">—</div>
+          <div class="rv-now" id="reviewNow"></div>
+        </div>
+        <div class="px panel-pad" style="min-height:120px">
+          <div class="panel-title">台词</div>
+          <div class="hint" id="rpThought">此局未保存台词。</div>
+        </div>
+        <div class="px panel-pad" id="reviewPanel">
+          <div class="panel-title">复盘报告</div>
+          <div class="hint" id="reviewSummary">这盘还没有复盘数据。</div>
+          <div class="hint" id="reviewTurn" style="margin-top:6px"></div>
+          <div class="col rv-list" id="reviewList"></div>
+          <div class="row" style="margin-top:8px">
+            <button class="px-btn small cyan" id="rpReview">复盘此局</button>
+            <div class="review-bar" id="reviewBar"><div class="review-bar-fill" id="reviewBarFill"></div></div>
+          </div>
+        </div>
+        <div class="px panel-pad">
+          <div class="panel-title">重新解说</div>
+          <div class="col">
+            <select class="field" id="rpChar"></select>
+            <select class="field" id="rpApi"></select>
+            <div class="row">
+              <button class="px-btn small cyan" id="rpDoComment">开始解说</button>
+              <button class="px-btn small" id="rpStopComment">停止</button>
+            </div>
+            <button class="px-btn small" id="rpExport">导出 PGN</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</div><!-- /#app -->
+
+<!-- ========================= MODAL: CHARACTER EDITOR ========================= -->
+<div class="modal-bg" id="charModal" role="dialog" aria-modal="true" aria-labelledby="charModalTitle" aria-hidden="true">
+  <div class="modal">
+    <h3 id="charModalTitle">角色编辑器</h3>
+    <div class="row" style="align-items:flex-start;gap:14px">
+      <div class="col" style="align-items:center;width:120px">
+        <canvas id="charAvaCanvas" class="ava-lg" width="32" height="32"></canvas>
+        <button class="px-btn small" id="btnRerollAva">随机立绘</button>
+        <button class="px-btn small" id="btnUploadAva">上传图片</button>
+        <input type="file" id="fileAva" accept="image/*" class="hidden">
+        <div class="hint center" style="font-size:10px">上传图会缩成 32×32 像素</div>
+      </div>
+      <div class="col grow">
+        <div><label class="lab">角色名</label><input class="field" id="charName" maxlength="18" placeholder="炎之棋士"></div>
+        <div>
+          <label class="lab">风格标签（选 1~3 个，或选“完全自定义”）</label>
+          <div class="tag-legend" id="tagLegend"></div>
+        </div>
+        <div>
+          <label class="lab">棋风倾向</label>
+          <select class="field" id="charStyle">
+            <option value="进攻">进攻 — 爱弃子搏杀</option>
+            <option value="均衡" selected>均衡 — 看局面下菜</option>
+            <option value="防守">防守 — 稳如老狗</option>
+          </select>
+        </div>
+        <div>
+          <label class="lab">自定义人格描述（选“完全自定义”时生效，或作为补充）</label>
+          <textarea class="field" id="charCustom" rows="2" placeholder="例如：表面懒散，其实每一步都算到十回合后……"></textarea>
+        </div>
+        <div>
+          <label class="lab">口头禅（1~2 句，用 / 分隔）</label>
+          <input class="field" id="charCatch" maxlength="60" placeholder="九折水平？ / 还得练！">
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <label class="lab">System Prompt（标签自动生成，可手改）</label>
+      <textarea class="field" id="charPrompt" rows="9" spellcheck="false"></textarea>
+      <div class="row" style="margin-top:6px">
+        <button class="px-btn small cyan" id="btnRegenPrompt">按标签重生成</button>
+        <span class="hint" id="promptLockHint"></span>
+      </div>
+    </div>
+    <div class="row" style="justify-content:flex-end;margin-top:14px">
+      <button class="px-btn small" id="btnCharCancel">取消</button>
+      <button class="px-btn danger small" id="btnCharDelete">删除</button>
+      <button class="px-btn gold" id="btnCharSave">保存角色</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================= MODAL: GENERIC CONFIRM ========================= -->
+<div class="modal-bg" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-hidden="true">
+  <div class="modal" style="width:min(430px,94vw)">
+    <h3 id="confirmTitle">确认</h3>
+    <p class="hint" id="confirmText" style="margin-bottom:14px">确定？</p>
+    <div class="row" style="justify-content:flex-end">
+      <button class="px-btn small" id="confirmNo">取消</button>
+      <button class="px-btn danger small" id="confirmYes">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================= MODAL: ENDPOINT CONFIRM ========================= -->
+<div class="modal-bg" id="endpointModal" role="dialog" aria-modal="true" aria-labelledby="epTitle" aria-hidden="true">
+  <div class="modal" style="width:min(470px,94vw)">
+    <h3 id="epTitle">确认发送地址</h3>
+    <p class="hint" style="margin-bottom:10px">首次向该地址发送密钥前需要你确认一次。</p>
+    <div class="ep-origin" id="epOrigin">—</div>
+    <p class="hint" id="epDetail" style="margin:10px 0 14px"></p>
+    <div class="row" style="justify-content:flex-end;flex-wrap:wrap">
+      <button class="px-btn small" id="epCancel">取消</button>
+      <button class="px-btn small cyan" id="epOnce">仅本次</button>
+      <button class="px-btn small green" id="epAlways">始终允许</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========================= MODAL: UNDO / DRAW CONFIRM ========================= -->
+<div class="modal-bg" id="caModal" role="dialog" aria-modal="true" aria-labelledby="caTitle" aria-hidden="true">
+  <div class="modal ca-modal" style="width:min(520px,94vw)">
+    <h3 id="caTitle">确认</h3>
+    <div class="ca-body">
+      <div class="ca-portrait" id="caPortraitWrap">
+        <canvas id="caPortrait" width="32" height="32"></canvas>
+      </div>
+      <div class="ca-speech">
+        <div class="ca-name" id="caName">—</div>
+        <div class="ca-bubble"><span id="caLine"></span></div>
+      </div>
+    </div>
+    <p class="hint" id="caHint" style="margin:10px 0 14px"></p>
+    <div class="row" style="justify-content:flex-end">
+      <button class="px-btn small" id="caCancel">取消</button>
+      <button class="px-btn gold" id="caConfirm">确定</button>
+    </div>
+  </div>
+</div>
+
+<div id="checkFlash"></div>
+<div id="toasts"></div>
+
+<div id="resultOverlay" role="dialog" aria-modal="true" aria-labelledby="resTitle" aria-hidden="true">
+  <div class="result-box">
+    <div class="mono" style="font-size:10px;color:#9c92c8" id="resTag">MATCH OVER</div>
+    <div class="result-title" id="resTitle">WHITE WINS</div>
+    <div class="result-sub" id="resSub">—</div>
+    <div class="result-quotes">
+      <div class="quote-card"><b id="resQuoteLName">白方</b><span id="resQuoteL">…</span></div>
+      <div class="quote-card"><b id="resQuoteRName">黑方</b><span id="resQuoteR">…</span></div>
+    </div>
+    <div class="row" style="justify-content:center">
+      <button class="px-btn small green" id="resRematch">再来一局</button>
+      <button class="px-btn small cyan" id="resSave">存棋谱</button>
+      <button class="px-btn small" id="resReview"><span id="reviewBtnText">复盘</span></button>
+      <button class="px-btn small" id="resHome">回主场</button>
+    </div>
+    <div class="review-bar wide" id="reviewBarRes"><div class="review-bar-fill" id="reviewBarResFill"></div></div>
+  </div>
+</div>
+
+<!-- 第三方：许可证见 THIRD_PARTY_NOTICES.md -->
+<script src="./assets/vendor/chess.js"></script>
+<script src="./assets/vendor/stockfish.inline.js"></script>
+<script src="./data/openings.inline.js"></script>
+<script src="./js/03_core.js"></script>
+<script src="./js/03a_api.js"></script>
+<script src="./js/04_render.js"></script>
+<script src="./js/05_run.js"></script>
+<script src="./js/05_board.js"></script>
+<script src="./js/06_engine.js"></script>
+<script src="./js/06b_analysis.js"></script>
+<script src="./js/06c_boardkeys.js"></script>
+<script src="./js/06a_endpoint.js"></script>
+<script src="./js/06_game.js"></script>
+<script src="./js/07a_settings.js"></script>
+<script src="./js/07b_clock.js"></script>
+<script src="./js/07_ui.js"></script>
+<script src="./js/08_wire.js"></script>
+<script src="./js/08a_undo.js"></script>
+<script src="./js/08b_openings.js"></script>
+<script src="./js/08c_review.js"></script>
+</body>
+</html>

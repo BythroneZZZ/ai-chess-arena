@@ -1,0 +1,44 @@
+{
+  "name": "ai-chess-arena",
+  "version": "2.10.0",
+  "private": true,
+  "description": "AI Chess Arena — 像素风国际象棋，AI 角色擂台战（零运行时依赖，可离线）",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OWNER/ai-chess-arena.git"
+  },
+  "keywords": ["chess", "ai", "canvas", "pixel-art", "stockfish", "llm", "game"],
+  "scripts": {
+    "start": "python src/build.py --serve",
+    "serve": "python -m http.server 8765",
+    "build": "python src/build.py",
+    "check": "python src/build.py --check",
+    "test": "node src/pw/run-tests.js",
+    "test:unit": "node src/pw/test_all.js",
+    "test:runtime": "node src/pw/test_phase2.js",
+    "test:lifecycle": "node src/pw/repro2.js",
+    "test:endpoint": "node src/pw/test_endpoint.js",
+    "test:clock": "node src/pw/test_clock.js",
+    "test:undodraw": "node src/pw/test_undodraw.js",
+    "test:ui": "node src/pw/test_ui_final.js",
+    "setup": "cd src/pw && npm i puppeteer-core@23",
+    "test:openings": "node src/pw/test_openings.js",
+    "test:eval": "node src/pw/test_eval.js",
+    "test:review": "node src/pw/test_review.js",
+    "test:keyboard": "node src/pw/test_keyboard.js",
+    "test:narrow": "node src/pw/test_narrow320.js",
+    "test:delivery": "node src/pw/test_delivery.js",
+    "subset-font": "python src/subset_font.py",
+    "test:interaction": "node src/pw/test_interaction.js",
+    "test:flip": "node src/pw/test_flip.js"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^23.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "_note": "本项目需通过本地服务器运行（浏览器不允许 file:// 页面读取本地资源）。双击 run.bat 即可。"
+}
+
